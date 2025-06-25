@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shared Expenses</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
+  h2 { border-bottom: 1px solid #ccc; }
+  form { margin-bottom: 20px; }
+  label { display: inline-block; width: 100px; }
+  input, select { margin-bottom: 10px; width: 200px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+</style>
+</head>
+<body>
+
+<h1>Shared Expenses App</h1>
+
+<section id="families-section">
+  <h2>Families</h2>
+  <form id="family-form">
+    <label>Name:</label><input type="text" id="family-name" required /><br />
+    <label>Members:</label><input type="number" id="family-members" min="1" required /><br />
+    <button type="submit">Add Family</button>
+  </form>
+  <table id="families-table"><thead><tr><th>ID</th><th>Name</th><th>Members</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section id="expenses-section">
+  <h2>Expenses</h2>
+  <form id="expense-form">
+    <label>Date:</label><input type="date" id="expense-date" required /><br />
+    <label>Description:</label><input type="text" id="expense-desc" /><br />
+    <label>Amount:</label><input type="number" id="expense-amount" min="0" step="0.01" required /><br />
+    <label>Paid by:</label>
+    <select id="expense-paid-by" required></select><br />
+    <button type="submit">Add Expense</button>
+  </form>
+  <table id="expenses-table"><thead><tr><th>ID</th><th>Date</th><th>Description</th><th>Amount</th><th>Paid By</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section id="paybacks-section">
+  <h2>Paybacks</h2>
+  <form id="payback-form">
+    <label>Date:</label><input type="date" id="payback-date" required /><br />
+    <label>From Family:</label>
+    <select id="payback-from" required></select><br />
+    <label>To Family:</label>
+    <select id="payback-to" required></select><br />
+    <label>Amount:</label><input type="number" id="payback-amount" min="0" step="0.01" required /><br />
+    <button type="submit">Add Payback</button>
+  </form>
+  <table id="paybacks-table"><thead><tr><th>ID</th><th>Date</th><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody></tbody></table>
+</section>
+
+<script>
+  const apiUrl = '';
+
+  // Helper to fill family dropdowns
+  async function loadFamilies() {
+    const res = await fetch(apiUrl + '/families');
+    const families = await res.json();
+    const expensePaidBy = document.getElementById('expense-paid-by');
+    const paybackFrom = document.getElementById('payback-from');
+    const paybackTo = document.getElementById('payback-to');
+
+    [expensePaidBy, paybackFrom, paybackTo].forEach(select => {
+      select.innerHTML = '';
+      families.forEach(fam => {
+        const opt = document.createElement('option');
+        opt.value = fam.id;
+        opt.textContent = fam.name;
+        select.appendChild(opt);
+      });
+    });
+
+    return families;
+  }
+
+  // Load and display families
+  async function refreshFamilies() {
+    const res = await fetch(apiUrl + '/families');
+    const families = await res.json();
+    const tbody = document.querySelector('#families-table tbody');
+    tbody.innerHTML = '';
+    families.forEach(fam => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${fam.id}</td><td>${fam.name}</td><td>${fam.members}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Load and display expenses
+  async function refreshExpenses() {
+    const res = await fetch(apiUrl + '/expenses');
+    const expenses = await res.json();
+    const families = await loadFamilies();
+    const tbody = document.querySelector('#expenses-table tbody');
+    tbody.innerHTML = '';
+    expenses.forEach(exp => {
+      const familyName = families.find(f => f.id === exp.paid_by)?.name || 'Unknown';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${exp.id}</td><td>${exp.date}</td><td>${exp.description || ''}</td><td>${exp.amount}</td><td>${familyName}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Load and display paybacks
+  async function refreshPaybacks() {
+    const res = await fetch(apiUrl + '/paybacks');
+    const paybacks = await res.json();
+    const families = await loadFamilies();
+    const tbody = document.querySelector('#paybacks-table tbody');
+    tbody.innerHTML = '';
+    paybacks.forEach(pb => {
+      const fromName = families.find(f => f.id === pb.from_family_id)?.name || 'Unknown';
+      const toName = families.find(f => f.id === pb.to_family_id)?.name || 'Unknown';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${pb.id}</td><td>${pb.date}</td><td>${fromName}</td><td>${toName}</td><td>${pb.amount}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Event listeners for forms
+
+  document.getElementById('family-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('family-name').value;
+    const members = parseInt(document.getElementById('family-members').value, 10);
+    await fetch(apiUrl + '/families', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, members }),
+    });
+    e.target.reset();
+    await refreshFamilies();
+    await loadFamilies();
+  });
+
+  document.getElementById('expense-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const date = document.getElementById('expense-date').value;
+    const description = document.getElementById('expense-desc').value;
+    const amount = parseFloat(document.getElementById('expense-amount').value);
+    const paid_by = parseInt(document.getElementById('expense-paid-by').value, 10);
+    await fetch(apiUrl + '/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, description, amount, paid_by }),
+    });
+    e.target.reset();
+    await refreshExpenses();
+  });
+
+  document.getElementById('payback-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const date = document.getElementById('payback-date').value;
+    const from_family_id = parseInt(document.getElementById('payback-from').value, 10);
+    const to_family_id = parseInt(document.getElementById('payback-to').value, 10);
+    const amount = parseFloat(document.getElementById('payback-amount').value);
+    if (from_family_id === to_family_id) {
+      alert("From and To families must be different!");
+      return;
+    }
+    await fetch(apiUrl + '/paybacks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, from_family_id, to_family_id, amount }),
+    });
+    e.target.reset();
+    await refreshPaybacks();
+  });
+
+  // Initial load
+  (async () => {
+    await refreshFamilies();
+    await refreshExpenses();
+    await refreshPaybacks();
+  })();
+
+</script>
+
+</body>
+</html>

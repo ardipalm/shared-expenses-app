@@ -5,13 +5,5 @@ services:
     build: .
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
     environment:
       - NODE_ENV=development
-
-  db:
-    image: nouchka/sqlite3
-    volumes:
-      - ./data:/root/db
-    command: tail -f /dev/null
